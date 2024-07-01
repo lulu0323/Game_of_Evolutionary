@@ -6,6 +6,7 @@ export class World {
    */
   constructor(cell_size) {
     this.cellSize = cell_size;
+    this.lessEnergy = 2;
     this.strokeWidth = 1;
     this.lifeColor = "#00c638";
     this.foodColor = "#199d9d";
@@ -21,7 +22,72 @@ export class World {
     this.resetWorld(cell_size);
   }
 
-  update() {}
+  update() {
+    let newGrid = [];
+    for (let c = 0; c < this.num_cols; c++) {
+      let newRow = [];
+      for (let r = 0; r < this.num_rows; r++) {
+        let cell = this.grid_map.grid[c][r];
+        if (cell.type === 'life') {
+          const rdNum = Math.ceil(Math.random() * 10);
+          const rdNum2 = Math.ceil(Math.random() * 10);
+          let newR = rdNum > 5 ? r + 1 : r - 1;
+          let newC = rdNum2 > 5 ?  c + 1 : c -1;
+          newR = newR > -1 ? newR : r;
+          newC = newC > -1 ? newC : c;
+          let nextCell = this.grid_map.grid[newC][newR];
+        }
+      }
+    }
+  }
+
+  renderRandomWorld(total_energy) {
+    let foodTotal = 0;
+    let lifeTotal = 0;
+    let totalEnergy = total_energy || 100;
+    for (let c = 0; c < this.num_cols; c++) {
+      for (let r = 0; r < this.num_rows; r++) {
+        const randomNumber = Math.ceil(Math.random() * 10); // 1-10 random
+        if (totalEnergy > 0) {
+          if (randomNumber > 0 && randomNumber < 3) {
+            // 20% empty
+            this.grid_map.grid[c][r].setType("empty");
+          } else if (randomNumber > 2 && randomNumber < 5) {
+            // 20% wall
+            this.grid_map.grid[c][r].setType("wall");
+          } else if (randomNumber > 4 && randomNumber < 8) {
+            // 30% food
+            this.grid_map.grid[c][r].setType("food");
+            foodTotal += 1;
+          } else {
+            // 30% life
+            const rdEny = Math.ceil(Math.random() * totalEnergy);
+            totalEnergy -= rdEny;
+            this.grid_map.grid[c][r].setType("life");
+            this.grid_map.grid[c][r].setEnergy(rdEny);
+            lifeTotal += 1;
+          }
+        } else {
+          if (randomNumber > 0 && randomNumber < 3) {
+            // 20% empty
+            this.grid_map.grid[c][r].setType("empty");
+          } else if (randomNumber > 2 && randomNumber < 5) {
+            // 20% wall
+            this.grid_map.grid[c][r].setType("wall");
+          } else {
+            // 60% food
+            this.grid_map.grid[c][r].setType("food");
+            foodTotal += 1;
+          }
+        }
+        this.renderCell(this.grid_map.grid[c][r]);
+      }
+    }
+    return {
+      food: foodTotal,
+      life: lifeTotal
+    }
+  }
 
   resetWorld(cell_size) {
     this.cellSize = cell_size;

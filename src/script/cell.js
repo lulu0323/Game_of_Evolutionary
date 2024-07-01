@@ -5,9 +5,14 @@ export class Cell {
     this.row = row;
     this.x = x;
     this.y = y;
+    this.energy = 0;
   }
 
   setType(type) {
     this.type = type;
+  }
+
+  setEnergy(energy) {
+    this.energy = energy;
   }
 }

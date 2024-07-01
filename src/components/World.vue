@@ -29,7 +29,7 @@
         ><span style="padding: 0 24px 0 12px">{{ foodNum }}</span>
         <span style="color: #00c638">Total of Creatures: </span
         ><span style="padding: 0 24px 0 12px">{{ lifeNum }}</span>
-        <span style="color: #00c638">Total of Step: </span
+        <span style="color: #282828">Total of Step: </span
         ><span style="padding: 0 24px 0 12px">{{ stepNum }}</span>
       </div>
       <div class="status-btn-clear translate-middle-y" @click="handleReset">
@@ -54,6 +54,7 @@ export default {
   data() {
     return {
       start: false,
+      originEnergy: 100,
       foodNum: 0,
       lifeNum: 0,
       stepNum: 0,
@@ -329,32 +330,9 @@ export default {
     },
     initRandomLife() {
       this.handleReset();
-      this.foodNum = 0;
-      this.lifeNum = 1;
-      const rdX = Math.floor(Math.random() * this.xNumberLong);
-      const rdY = Math.floor(Math.random() * this.yNumberLong);
-      const lifeKey = `${rdX},${rdY}`;
-      this.gridsData[lifeKey].type = "life";
-      const rdEny = Math.ceil(Math.random() * 100); // 1-100的能量等级
-      this.gridsData[lifeKey].energy = rdEny;
-      this.gridsData[lifeKey].originEnergy = rdEny;
-      this.renderGrid(this.gridsData[lifeKey]);
-      for (let key in this.gridsData) {
-        const grid = this.gridsData[key];
-        if (grid.type !== "life") {
-          const randomNumber = Math.ceil(Math.random() * 10); // 生成一个1-10的随机整数
-          if (randomNumber > 0 && randomNumber < 3) {
-            // 判断为食物
-            grid.type = "food";
-            this.foodNum += 1;
-          } else {
-            // 判断为空点
-            grid.type = "empty";
-          }
-          this.renderGrid(grid);
-        }
-      }
-      console.warn("fffood", this.foodNum, rdX, rdY);
+      const res = this.world.renderRandomWorld(this.originEnergy);
+      this.foodNum = res.food;
+      this.lifeNum = res.life;
     },
   },
 };
