@@ -2,7 +2,7 @@
   "name": "life-engine",
   "version": "1.0.0",
   "description": "A Vue.js project",
-  "author": "luzhiming <maxluzm@163.com>",
+  "author": "Zhijian_Lu <windlu2022@gmail.com>",
   "private": true,
   "scripts": {
     "dev": "webpack-dev-server --inline --progress --config build/webpack.dev.conf.js",
