@@ -101,6 +101,9 @@ export default {
   methods: {
     handleReset() {
       // 清空世界
+      this.stepNum = 0;
+      this.foodNum = 0;
+      this.lifeNum = 0;
       this.start = false;
       this.pauseLife();
       this.world.resetWorld(this.cellSize);
@@ -122,8 +125,14 @@ export default {
     startLife() {
       let speed = this.speed;
       this.lifeGoingInterval = setInterval(() => {
-        this.world.update();
-        // this.initLifeGo();
+        let res = this.world.update();
+        this.stepNum += 1;
+        this.foodNum = res.food;
+        this.lifeNum = res.life;
+        if (res.food === 0 || res.life === 0) {
+          // 生命为0或者食物为0则暂停演化，定格在当前网格状态
+          this.pauseLife();
+        }
       }, 1000 / speed);
     },
     pauseLife() {
@@ -132,8 +141,8 @@ export default {
         this.lifeGoingInterval = null;
       }
     },
-    setGridSize(num) {
-      this.gridSize = num;
+    setCellSize(num) {
+      this.cellSize = num;
       this.world.resetWorld(this.cellSize);
     },
     handleMouseDown(e) {
@@ -141,192 +150,6 @@ export default {
       const clickY = e.clientY; // 点击的像素点位置y (纵向)
       if (this.isSetting) {
       }
-    },
-    initLifeGo() {
-      if (this.lifeNum === 0) {
-        this.pauseLife();
-        return;
-      }
-      let lifeChangeData = {};
-      for (let key in this.gridsData) {
-        const grid = this.gridsData[key];
-        if (grid.type === "life") {
-          const xNum = grid.xNum;
-          const yNum = grid.yNum;
-          const randomNext = Math.ceil(Math.random() * 8); // 生成1-8的随机整数作为位置代号
-          let nextKey = this.getRandomKey(randomNext, xNum, yNum);
-          grid.energy -= 1;
-          if (nextKey) {
-            let nextXNum = Number(nextKey.split(",")[0]);
-            let nextYNum = Number(nextKey.split(",")[1]);
-            const nextStep = this.gridsData[nextKey];
-            const usedStep = lifeChangeData[nextKey];
-            if (!usedStep && nextStep.type === "food") {
-              grid.energy += 2;
-              lifeChangeData[nextKey] = Object.assign(
-                {
-                  xNum: nextStep.xNum,
-                  yNum: nextStep.yNum,
-                  x1: nextStep.x1,
-                  x2: nextStep.x2,
-                  y1: nextStep.y1,
-                  y2: nextStep.y2,
-                  gridSize: nextStep.gridSize,
-                },
-                {
-                  type: "life",
-                  energy: grid.energy,
-                  originEnergy: grid.originEnergy,
-                }
-              );
-              this.foodNum -= 1;
-
-              const enyRg = grid.energy - grid.originEnergy;
-              if (enyRg > 0 && enyRg / grid.originEnergy > 0.33) {
-                // 繁殖
-                let reproductionRandom = Math.ceil(Math.random() * 8);
-                let reproductionKey = this.getRandomKey(
-                  reproductionRandom,
-                  nextXNum,
-                  nextYNum
-                );
-                if (reproductionKey) {
-                  const nextRpStep = this.gridsData[reproductionKey];
-                  nextRpStep.energy = grid.originEnergy;
-                  const usedRpStep = lifeChangeData[reproductionKey];
-                  if (!usedRpStep && nextRpStep.type === "food") {
-                    nextRpStep.energy += 2;
-                    lifeChangeData[reproductionKey] = Object.assign(
-                      {},
-                      nextRpStep
-                    );
-                    lifeChangeData[reproductionKey].type = "life";
-                    this.foodNum -= 1;
-                    this.lifeNum += 1;
-                  } else if (usedRpStep && usedRpStep.type === "life") {
-                    if (nextRpStep.energy <= usedRpStep.energy) {
-                      // 谁饿谁杀对方
-                      lifeChangeData[reproductionKey] = Object.assign(
-                        {},
-                        nextRpStep
-                      );
-                      lifeChangeData[reproductionKey].type = "life";
-                    }
-                  }
-                }
-              }
-            } else if (usedStep && usedStep.type === "life") {
-              if (grid.energy <= usedStep.energy) {
-                // 谁饿谁杀对方
-                lifeChangeData[nextKey] = Object.assign(
-                  {
-                    xNum: nextStep.xNum,
-                    yNum: nextStep.yNum,
-                    x1: nextStep.x1,
-                    x2: nextStep.x2,
-                    y1: nextStep.y1,
-                    y2: nextStep.y2,
-                    gridSize: nextStep.gridSize,
-                  },
-                  {
-                    type: "life",
-                    energy: grid.energy,
-                    originEnergy: grid.originEnergy,
-                  }
-                );
-                this.lifeNum -= 1;
-              }
-            } else {
-              lifeChangeData[nextKey] = Object.assign(
-                {
-                  xNum: nextStep.xNum,
-                  yNum: nextStep.yNum,
-                  x1: nextStep.x1,
-                  x2: nextStep.x2,
-                  y1: nextStep.y1,
-                  y2: nextStep.y2,
-                  gridSize: nextStep.gridSize,
-                },
-                {
-                  type: "life",
-                  energy: grid.energy,
-                  originEnergy: grid.originEnergy,
-                }
-              );
-            }
-
-            lifeChangeData[key] = Object.assign(
-              {
-                xNum: grid.xNum,
-                yNum: grid.yNum,
-                x1: grid.x1,
-                x2: grid.x2,
-                y1: grid.y1,
-                y2: grid.y2,
-                gridSize: grid.gridSize,
-              },
-              {
-                type: "empty",
-                energy: nextStep.energy,
-                originEnergy: nextStep.originEnergy,
-              }
-            );
-          }
-        }
-      }
-
-      Object.assign(this.gridsData, lifeChangeData);
-
-      for (let key in this.gridsData) {
-        const grid = this.gridsData[key];
-        this.renderGrid(grid);
-      }
-    },
-    getRandomKey(randomNext, xNum, yNum) {
-      let nextKey = "";
-      switch (randomNext) {
-        case 1:
-          if (xNum - 1 >= 0 && yNum - 1 > 0) {
-            nextKey = `${xNum - 1},${yNum - 1}`;
-          }
-          break;
-        case 2:
-          if (yNum - 1 > 0) {
-            nextKey = `${xNum},${yNum - 1}`;
-          }
-          break;
-        case 3:
-          if (xNum + 1 <= this.xNumberLong && yNum - 1 > 0) {
-            nextKey = `${xNum + 1},${yNum - 1}`;
-          }
-          break;
-        case 4:
-          if (xNum - 1 >= 0) {
-            nextKey = `${xNum - 1},${yNum}`;
-          }
-          break;
-        case 5:
-          if (xNum + 1 <= this.xNumberLong) {
-            nextKey = `${xNum + 1},${yNum}`;
-          }
-          break;
-        case 6:
-          if (xNum - 1 >= 0 && yNum + 1 <= this.yNumberLong) {
-            nextKey = `${xNum - 1},${yNum + 1}`;
-          }
-          break;
-        case 7:
-          if (yNum + 1 <= this.yNumberLong) {
-            nextKey = `${xNum},${yNum + 1}`;
-          }
-          break;
-        case 8:
-          if (xNum + 1 <= this.xNumberLong && yNum + 1 <= this.yNumberLong) {
-            nextKey = `${xNum + 1},${yNum + 1}`;
-          }
-          break;
-      }
-      return nextKey;
     },
     initRandomLife() {
       this.handleReset();

@@ -5,7 +5,8 @@ export class Cell {
     this.row = row;
     this.x = x;
     this.y = y;
-    this.energy = 0;
+    this.energy = 0; // 能量等级
+    this.reproduce = 0; // 繁殖所需要的能量等级
   }
 
   setType(type) {
@@ -14,5 +15,9 @@ export class Cell {
 
   setEnergy(energy) {
     this.energy = energy;
+  }
+
+  setReproduce(reproduce) {
+    this.reproduce = reproduce;
   }
 }
