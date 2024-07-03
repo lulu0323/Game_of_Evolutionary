@@ -54,7 +54,7 @@ export default {
   data() {
     return {
       start: false,
-      originEnergy: 100,
+      originEnergy: 500,
       foodNum: 0,
       lifeNum: 0,
       stepNum: 0,
@@ -66,11 +66,11 @@ export default {
           label: "Low",
         },
         {
-          value: 20,
+          value: 5,
           label: "Medium",
         },
         {
-          value: 50,
+          value: 10,
           label: "Fast",
         },
       ],
@@ -131,6 +131,7 @@ export default {
         this.lifeNum = res.life;
         if (res.food === 0 || res.life === 0) {
           // 生命为0或者食物为0则暂停演化，定格在当前网格状态
+          this.start = false;
           this.pauseLife();
         }
       }, 1000 / speed);

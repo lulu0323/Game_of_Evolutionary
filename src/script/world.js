@@ -145,7 +145,7 @@ export class World {
     }
 
     let endTime = Date.now() - startTime;
-    console.log('evolutionary_time:', endTime);
+    // console.log('evolutionary_time:', endTime);
 
     return {
       food: foodTotal,
