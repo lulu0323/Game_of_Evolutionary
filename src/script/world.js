@@ -25,8 +25,15 @@ export class World {
     this.resetWorld(cell_size);
   }
 
-  update() {
-    let startTime = Date.now();
+  getCell(col, row) {
+    return this.grid_map.cellAt(col, row);
+  }
+
+  update(options) {
+    let mr = options.mr; // 移动概率
+    let rr = options.rr; // 繁殖概率
+    let fr = options.fr; // 生成食物概率
+    let startTime = Date.now(); // 计时起点
     let lifeNextData = {};
     function setLifeData(col, row, lifeObject) {
       // 记录生命点的数据
@@ -45,6 +52,15 @@ export class World {
       }
     }
 
+    let newFoodData = {};
+    function setNewFoodData(col, row, foodObject) {
+      // 记录空格生成食物的点
+      if (!newFoodData[col]) {
+        newFoodData[col] = {};
+      }
+      newFoodData[col][row] = foodObject;
+    }
+
     // first step: 计算生命点行进的随机位置以及能量衰减
     let newGrid = [];
     for (let c = 0; c < this.num_cols; c++) {
@@ -54,30 +70,48 @@ export class World {
         const cloneCell = {
           type: cell.type,
           energy: cell.energy,
-          reproduce: cell.reproduce,
+          ex: cell.ex,
+          es: cell.es,
+          er: cell.er,
+          rr: cell.rr,
+          em: cell.em,
+          mRate: cell.mRate,
+          fr: cell.fr,
         };
         if (cell.type === 'life') {
           // 生命点独立逻辑
-          const rdNum = Math.ceil(Math.random() * 8);
-          const rdRes = getRandomKey(rdNum, c, r);
-          let newR = rdRes.row;
-          let newC = rdRes.col;
-          if (newR < 0 || newC < 0 || newR >= this.num_rows || newC >= this.num_cols) {
-            // 走到非法index，则视为撞到障碍物，即边缘视作障碍物
-            cell.setEnergy(cloneCell.energy - 1);
-            cloneCell.energy = cell.energy;
-            setLifeData(c, r, cloneCell);
-          } else {
-            let nextCell = this.grid_map.grid[newC][newR];
-            if (nextCell.type === 'wall') {
-              cell.setEnergy(cloneCell.energy - 1);
-              cloneCell.energy = cell.energy;
+          cell.setEnergy(cloneCell.energy - cell.es); // 每一步骤固定消耗能量
+          cloneCell.energy = cell.energy;
+          if (cell.energy <= 0) {
+            // 能量消耗完就消失，不继续做判断
+            cell.resetCell("empty");
+          } else if (cell.mRate >= mr) {
+            // 可移动
+            const rdNum = Math.ceil(Math.random() * 8); // 随机8个方向
+            const rdRes = getRandomKey(rdNum, c, r); // 方向值
+            let newR = rdRes.row;
+            let newC = rdRes.col;
+            if (newR < 0 || newC < 0 || newR >= this.num_rows || newC >= this.num_cols) {
+              // 走到非法index，则视为撞到障碍物，即边缘视作障碍物
+              // todo 撞墙要不要消耗移动能量？
+              // cell.setEnergy(cloneCell.energy - cell.em); // 移动需要额外消耗
+              // cloneCell.energy = cell.energy;
               setLifeData(c, r, cloneCell);
             } else {
-              // 不撞障碍物则允许走向下一步，当前步置为空
-              cell.setType("empty");
-              cloneCell.energy = cell.energy - 1;
-              setLifeData(newC, newR, cloneCell);
+              let nextCell = this.grid_map.grid[newC][newR];
+              if (nextCell.type === 'wall') {
+                // 撞障碍物
+                // todo 撞墙要不要消耗移动能量？
+                // cell.setEnergy(cloneCell.energy - cell.em); // 移动需要额外消耗
+                // cloneCell.energy = cell.energy;
+                setLifeData(c, r, cloneCell);
+              } else {
+                // 不撞障碍物则允许走向下一步，当前步置为空
+                cell.setEnergy(cloneCell.energy - cell.em); // 移动需要额外消耗
+                cloneCell.energy = cell.energy;
+                cell.resetCell("empty");
+                setLifeData(newC, newR, cloneCell);
+              }
             }
           }
           newRow.push(cell);
@@ -89,6 +123,11 @@ export class World {
           newRow.push(cell);
         } else if (cell.type === 'empty') {
           // 空白点独立逻辑
+          if (cell.fr >= fr) {
+            setNewFoodData(c, r, {
+              type: 'food'
+            });
+          }
           newRow.push(cell);
         }
       }
@@ -100,34 +139,94 @@ export class World {
       for (let r = 0; r < this.num_rows; r++) {
         let newCell = newGrid[c][r];
         let hadLife = lifeNextData[c] && lifeNextData[c][r] ? lifeNextData[c][r] : null;
+        let hadFood = newFoodData[c] && newFoodData[c][r] ? newFoodData[c][r] : null;
         if (newCell.type === 'wall') {
           // 障碍物处不会出现生命点
         } else if (newCell.type === 'empty') {
           if (hadLife && hadLife.energy > 0) {
-            // 空格可直接存放能量等级大于0的生命点，等于零就死掉
+            // 空格可直接存放能量等级大于0的生命点，小于等于零就死掉
             newCell.setType('life');
+            newCell.setEx(hadLife.ex);
+            newCell.setEs(hadLife.es);
+            newCell.setEr(hadLife.er);
+            newCell.setRr(hadLife.rr);
+            newCell.setEm(hadLife.em);
+            newCell.setMRate(hadLife.mRate);
             newCell.setEnergy(hadLife.energy);
-            newCell.setReproduce(hadLife.reproduce);
+          } else if (hadFood) {
+            // 没有被生命占领且会生成食物的空格
+            newCell.resetCell('food');
           }
         } else if (newCell.type === 'food') {
           if (hadLife) {
-            // 食物点可使生命的能量等级不减并+1，所以要用+2计算，减到0的点吃到食物也能变成2
+            // 食物点可使生命的能量等级+1
             newCell.setType('life');
-            newCell.setEnergy(hadLife.energy + 2);
-            newCell.setReproduce(hadLife.reproduce);
+            newCell.setEx(hadLife.ex);
+            newCell.setEs(hadLife.es);
+            newCell.setEr(hadLife.er);
+            newCell.setRr(hadLife.rr);
+            newCell.setEm(hadLife.em);
+            newCell.setMRate(hadLife.mRate);
+            newCell.setEnergy(hadLife.energy + 1);
           }
         }
         this.grid_map.grid[c][r] = newCell;
       }
     }
 
-    // third step: 计算繁殖可能性 todo
-    // for (let c = 0; c < this.num_cols; c++) {
-    //   for (let r = 0; r < this.num_rows; r++) {
-    //     // 计算繁殖
-    //     let cell = this.grid_map.grid[c][r];
-    //   }
-    // }
+    // third step: 计算繁殖可能性
+    for (let c = 0; c < this.num_cols; c++) {
+      for (let r = 0; r < this.num_rows; r++) {
+        // 计算繁殖
+        let cell = this.grid_map.grid[c][r];
+        if (cell.type === 'life' && cell.rr >= rr && cell.energy > cell.er) {
+          // 允许繁殖
+          cell.setEnergy(cell.energy - cell.er);
+          const rdNum = Math.ceil(Math.random() * 8); // 随机8个方向
+          const rdRes = getRandomKey(rdNum, c, r); // 方向值
+          let newR = rdRes.row;
+          let newC = rdRes.col;
+          if (newR < 0 || newC < 0 || newR >= this.num_rows || newC >= this.num_cols) {
+            // 走到非法index，则视为撞到障碍物，即边缘视作障碍物
+            // todo 繁殖在障碍物上则直接消失，还是繁殖失败？
+          } else {
+            let nextCell = this.grid_map.grid[newC][newR];
+            if (nextCell.type === 'life') {
+              if (cell.er < nextCell.energy) {
+                // 繁殖后的谁饿杀死谁
+                nextCell.setEx(cell.er);
+                nextCell.setEs();
+                nextCell.setEr();
+                nextCell.setRr();
+                nextCell.setEm();
+                nextCell.setMRate();
+                nextCell.setEnergy();
+              }
+            } else if (nextCell.type === 'food') {
+              nextCell.setType('life');
+              nextCell.setEx(cell.er + 1);
+              nextCell.setEs();
+              nextCell.setEr();
+              nextCell.setRr();
+              nextCell.setEm();
+              nextCell.setMRate();
+              nextCell.setEnergy();
+            } else if (nextCell.type === 'wall') {
+              // todo
+            } else if (nextCell.type === 'empty') {
+              nextCell.setType('life');
+              nextCell.setEx(cell.er);
+              nextCell.setEs();
+              nextCell.setEr();
+              nextCell.setRr();
+              nextCell.setEm();
+              nextCell.setMRate();
+              nextCell.setEnergy();
+            }
+          }
+        }
+      }
+    }
 
     // forth step: 计算食物总数，生命总数，渲染网格
     let foodTotal = 0;
@@ -145,7 +244,7 @@ export class World {
     }
 
     let endTime = Date.now() - startTime;
-    // console.log('evolutionary_time:', endTime);
+    console.log('evolutionary_time:', endTime);
 
     return {
       food: foodTotal,
@@ -153,47 +252,26 @@ export class World {
     }
   }
 
-  renderRandomWorld(total_energy) {
+  renderRandomWorld() {
     let foodTotal = 0;
     let lifeTotal = 0;
-    let totalEnergy = total_energy || 100;
     for (let c = 0; c < this.num_cols; c++) {
       for (let r = 0; r < this.num_rows; r++) {
         const randomNumber = Math.ceil(Math.random() * 10); // 1-10 random
-        if (totalEnergy > 0) {
-          if (randomNumber > 0 && randomNumber < 3) {
-            // 20% empty
-            this.grid_map.grid[c][r].setType("empty");
-          } else if (randomNumber > 2 && randomNumber < 5) {
-            // 20% wall
-            this.grid_map.grid[c][r].setType("wall");
-          } else if (randomNumber > 4 && randomNumber < 8) {
-            // 30% food
-            this.grid_map.grid[c][r].setType("food");
-            foodTotal += 1;
-          } else {
-            // 30% life
-            const rdEny = Math.ceil(Math.random() * totalEnergy); // 总量固定的能量值，随机分配给生命点
-            // 每个生命点的允许繁殖等级为2+自身初始等级的随机数，即保证
-            const rdReproduce = 2 + Math.ceil(Math.random() * rdEny);
-            totalEnergy -= rdEny;
-            this.grid_map.grid[c][r].setType("life");
-            this.grid_map.grid[c][r].setEnergy(rdEny);
-            this.grid_map.grid[c][r].setReproduce(rdReproduce);
-            lifeTotal += 1;
-          }
+        if (randomNumber > 0 && randomNumber < 3) {
+          // 20% empty
+          this.grid_map.grid[c][r].resetCell("empty");
+        } else if (randomNumber > 2 && randomNumber < 5) {
+          // 20% wall
+          this.grid_map.grid[c][r].resetCell("wall");
+        } else if (randomNumber > 4 && randomNumber < 8) {
+          // 30% food
+          this.grid_map.grid[c][r].resetCell("food");
+          foodTotal += 1;
         } else {
-          if (randomNumber > 0 && randomNumber < 3) {
-            // 20% empty
-            this.grid_map.grid[c][r].setType("empty");
-          } else if (randomNumber > 2 && randomNumber < 5) {
-            // 20% wall
-            this.grid_map.grid[c][r].setType("wall");
-          } else {
-            // 60% food
-            this.grid_map.grid[c][r].setType("food");
-            foodTotal += 1;
-          }
+          // 30% life
+          this.grid_map.grid[c][r].resetCell("life");
+          lifeTotal += 1;
         }
         this.renderCell(this.grid_map.grid[c][r]);
       }
@@ -205,6 +283,8 @@ export class World {
   }
 
   resetWorld(cell_size) {
+    const context = this.worldCanvas.getContext("2d");
+    context.clearRect(0, 0, this.worldCanvas.width, this.worldCanvas.height);
     this.cellSize = cell_size;
     this.num_cols = Math.floor(
       this.worldCanvas.width / (this.cellSize + this.strokeWidth)
@@ -274,8 +354,34 @@ export class World {
     context.save();
     context.fillStyle = color;
     context.fillRect(cell.x, cell.y, this.cellSize, this.cellSize);
+    if (cell.type === 'life') {
+      context.fillStyle = "#000000";
+      const textX = cell.x + this.cellSize / 2;
+      const textY = cell.y + this.cellSize / 2;
+      context.fillText(cell.energy, textX, textY);
+    }
     context.lineWidth = this.strokeWidth;
     context.strokeStyle = this.gridBorderColor;
     context.strokeRect(cell.x, cell.y, this.cellSize, this.cellSize);
+  }
+
+  getCellByPoint(point) {
+    let resCell = null;
+    for (let col of this.grid_map.grid) {
+      for (let cell of col) {
+        let gotCell = this.calcPointInCell(point, cell);
+        if (gotCell) {
+          resCell = gotCell;
+        }
+      }
+    }
+    return resCell;
+  }
+
+  calcPointInCell(point, cell) {
+    let xInCell = point.x > cell.x && point.x < cell.x + this.cellSize;
+    let yInCell = point.y > cell.y && point.y < cell.y + this.cellSize;
+    let isPointInCell = xInCell && yInCell;
+    return isPointInCell ? cell : null;
   }
 }

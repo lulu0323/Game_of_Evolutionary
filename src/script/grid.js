@@ -7,6 +7,7 @@ export class Grid {
 
   resize(cols, rows, spaceX, spaceY, cell_size, stroke_width) {
     this.grid = [];
+    this.cellSize = cell_size;
     this.cols = cols;
     this.rows = rows;
     for (let c = 0; c < cols; c++) {
