@@ -1,6 +1,5 @@
 import { Grid } from "./grid";
 import DeepClone from "./DeepClone";
-import {clone} from "node-notifier/lib/utils";
 import {getRandomKey} from "./util";
 
 export class World {
@@ -342,6 +341,7 @@ export class World {
   }
 
   renderCell(cell) {
+    let fontSize = 12;
     let color = this.emptyGridColor;
     if (cell.type === "life") {
       color = this.lifeColor;
@@ -355,8 +355,11 @@ export class World {
     context.fillStyle = color;
     context.fillRect(cell.x, cell.y, this.cellSize, this.cellSize);
     if (cell.type === 'life') {
+      context.font = fontSize + "px Arial";
       context.fillStyle = "#000000";
-      const textX = cell.x + this.cellSize / 2;
+      let text = cell.energy.toString();
+      let textWidth = context.measureText(text).width;
+      const textX = cell.x + this.cellSize / 2 - textWidth / 2;
       const textY = cell.y + this.cellSize / 2;
       context.fillText(cell.energy, textX, textY);
     }

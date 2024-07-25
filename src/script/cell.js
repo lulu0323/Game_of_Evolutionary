@@ -47,11 +47,11 @@ export class Cell {
   }
 
   setEs(es) {
-    this.es = es !== undefined ? es : Math.ceil(this.ex / 20);
+    this.es = es !== undefined ? es : Number((this.ex / 20).toFixed(2));
   }
 
   setEr(er) {
-    this.er = er !== undefined ? er : Math.ceil(this.ex / 3);
+    this.er = er !== undefined ? er : Number((this.ex / 3).toFixed(2));
   }
 
   setRr(rr) {
@@ -59,7 +59,7 @@ export class Cell {
   }
 
   setEm(em) {
-    this.em = em !== undefined ? em : Math.ceil(this.ex / 10);
+    this.em = em !== undefined ? em : Number((this.ex / 10).toFixed(2));
   }
 
   setMRate(mRate) {

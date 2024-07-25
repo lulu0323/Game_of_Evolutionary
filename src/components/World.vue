@@ -239,6 +239,7 @@ export default {
       displayMr: 50,
       displayRr: 50,
       displayFr: 50,
+      updateLoading: false,
     };
   },
   mounted() {
@@ -275,12 +276,8 @@ export default {
         this.startLife();
       }
     },
-    startLife() {
-      if (this.showSetting) {
-        return;
-      }
-      let speed = this.speed;
-      this.lifeGoingInterval = setInterval(() => {
+    updateLife() {
+      return new Promise((resolve) => {
         this.displayMr = this.useMRate;
         this.displayRr = this.useRRate;
         this.displayFr = this.useFRate;
@@ -306,6 +303,22 @@ export default {
           // 生命为0或者食物为0则暂停演化，定格在当前网格状态
           this.start = false;
           this.pauseLife();
+        }
+        this.updateLoading = false;
+        resolve();
+      });
+    },
+    startLife() {
+      if (this.showSetting) {
+        return;
+      }
+      let speed = this.speed;
+      this.lifeGoingInterval = setInterval(() => {
+        if (!this.updateLoading) {
+          this.updateLoading = true;
+          this.updateLife();
+        } else {
+          console.warn('kale: ', this.stepNum);
         }
       }, 1000 / speed);
     },
