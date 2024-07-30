@@ -24,14 +24,55 @@
       <div
         class="status-init-btn translate-middle-y"
         style="left: 8px;"
+        :style="{background: showSetting ? '#EEA920' : '#00a4a7'}"
         @click="handleOpenSetting">
-        setting
+        {{ showSetting ? 'Close' : 'System' }}
       </div>
       <div
         class="status-init-btn translate-middle-y"
         style="left: 116px;"
+        :style="{background: showEye ? '#EEA920' : '#00a4a7'}"
         @click="showEye = !showEye">
-        {{ showEye ? '关闭监控' : '打开监控' }}
+        {{ showEye ? 'Close' : 'Monitor' }}
+      </div>
+      <div
+        class="status-init-btn translate-middle-y"
+        style="left: 224px;"
+        :style="{background: showEditGrid ? '#EEA920' : '#00a4a7'}"
+        @click="handleGridCellSetting">
+        {{ showEditGrid ? 'Finish' : 'Edit' }}
+      </div>
+      <div
+        v-if="showEditGrid"
+        class="status-init-btn translate-middle-y"
+        style="left: 332px;">
+        <select
+          v-model="settingType"
+          style="width: 100%; height: 100%"
+        >
+          <option
+            v-for="item in settingTypeOptions"
+            :key="item.value"
+            :value="item.value"
+          >
+            {{ item.label }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="showEditGrid"
+        class="status-init-btn translate-middle-y"
+        style="left: 440px;width: 130px;"
+      >
+        <input v-model="useSetGridRate" style="width: 100px;height: 60%">
+        <span> %</span>
+      </div>
+      <div
+        v-if="showEditGrid"
+        class="status-init-btn translate-middle-y"
+        style="left: 586px;background: #fb5b17"
+        @click="handleSetAllCellByType">
+        {{ 'Setup %' }}
       </div>
       <div class="status-init-select translate-middle-y">
         <select
@@ -102,7 +143,7 @@
 <!--    设置界面-->
     <div v-if="showSetting" class="setting-wrapper">
       <div class="setting-item-row">
-        <span style="padding-left: 12px">系统设置</span>
+        <span style="padding-left: 12px">system setting</span>
         <div class="setting-close-x" @click="showSetting = false">
           <span>X</span>
         </div>
@@ -129,7 +170,11 @@
         </select>
       </div>
       <div class="setting-item-row border-top" style="text-align: center">
-        <span>标准牌刷新方式:  </span>
+        <span>Frequency of Food:  </span>
+        <input v-model="foodRunMax" style="width: 100px;height: 60%">
+      </div>
+      <div class="setting-item-row border-top" style="text-align: center">
+        <span>Style:  </span>
         <select
           v-model="rateType"
           style="width: 100px; height: 70%"
@@ -144,20 +189,24 @@
         </select>
       </div>
       <div v-if="rateType === 'bold'" class="setting-item-row border-top" style="text-align: center">
-        <span>移动概率:  </span>
+        <span>Move Rate:  </span>
         <input v-model="useMRate" style="width: 100px;height: 60%">
         <span> %</span>
       </div>
       <div v-if="rateType === 'bold'" class="setting-item-row border-top" style="text-align: center">
-        <span>繁殖概率:  </span>
+        <span>Reproduce Rate:  </span>
         <input v-model="useRRate" style="width: 100px;height: 60%">
         <span> %</span>
       </div>
       <div v-if="rateType === 'bold'" class="setting-item-row border-top" style="text-align: center">
-        <span>食物生成概率:  </span>
+        <span>Food Rate:  </span>
         <input v-model="useFRate" style="width: 100px;height: 60%">
         <span> %</span>
       </div>
+    </div>
+
+    <div v-if="toast" class="world-toast-wrapper">
+      {{toastText}}
     </div>
   </div>
 </template>
@@ -207,11 +256,11 @@ export default {
       rateTypeOptions: [
         {
           value: "randomly",
-          label: "自动随机",
+          label: "Random",
         },
         {
           value: "bold",
-          label: "固定",
+          label: "Fixed",
         },
       ],
       isSetting: false,
@@ -219,15 +268,19 @@ export default {
       settingTypeOptions: [
         {
           value: "life",
-          label: "Life",
+          label: "Set Life",
         },
         {
           value: "food",
-          label: "Food",
+          label: "Set Food",
         },
         {
           value: "wall",
-          label: "Wall",
+          label: "Set block",
+        },
+        {
+          value: "empty",
+          label: "Set Empty",
         },
       ],
       showSetting: false,
@@ -240,10 +293,15 @@ export default {
       displayRr: 50,
       displayFr: 50,
       updateLoading: false,
+      toast: false,
+      toastText: '',
+      showEditGrid: false,
+      useSetGridRate: 100,
+      foodRunMax: 10,
     };
   },
   mounted() {
-    this.world = new World(this.cellSize);
+    this.world = new World(this.cellSize, this.foodRunMax);
   },
   beforeDestroy() {
     this.pauseLife();
@@ -251,6 +309,7 @@ export default {
   methods: {
     handleOpenSetting() {
       this.pauseLife();
+      this.showEditGrid = false;
       this.showSetting = !this.showSetting;
     },
     handleReset() {
@@ -263,6 +322,14 @@ export default {
       this.world.resetWorld(this.cellSize);
     },
     handleStatusChanged() {
+      if (this.showSetting) {
+        this.showToast('Please close setting board');
+        return;
+      }
+      if (this.showEditGrid) {
+        this.showToast('Please stop edit grid');
+        return;
+      }
       this.start = !this.start;
       if (this.start) {
         this.startLife();
@@ -278,9 +345,9 @@ export default {
     },
     updateLife() {
       return new Promise((resolve) => {
-        this.displayMr = this.useMRate;
-        this.displayRr = this.useRRate;
-        this.displayFr = this.useFRate;
+        this.displayMr = Number(this.useMRate);
+        this.displayRr = Number(this.useRRate);
+        this.displayFr = Number(this.useFRate);
         if (this.rateType === 'randomly') {
           this.displayMr = Math.ceil(Math.random() * 100);
           this.displayRr = Math.ceil(Math.random() * 100);
@@ -299,7 +366,7 @@ export default {
         this.stepNum += 1;
         this.foodNum = res.food;
         this.lifeNum = res.life;
-        if (res.food === 0 || res.life === 0) {
+        if (res.life === 0) {
           // 生命为0或者食物为0则暂停演化，定格在当前网格状态
           this.start = false;
           this.pauseLife();
@@ -309,10 +376,12 @@ export default {
       });
     },
     startLife() {
-      if (this.showSetting) {
-        return;
-      }
       let speed = this.speed;
+      let numRes = this.world.getCurrentCheckNum();
+      this.foodNum = numRes.food;
+      this.lifeNum = numRes.life;
+      let foodRunMax = !isNaN(this.foodRunMax) ? Number(this.foodRunMax) : 10;
+      this.world.setWorldFoodStep(foodRunMax);
       this.lifeGoingInterval = setInterval(() => {
         if (!this.updateLoading) {
           this.updateLoading = true;
@@ -331,6 +400,23 @@ export default {
     handleCellSizeChanged() {
       this.handleReset();
     },
+    handleGridCellSetting() {
+      if (this.showSetting) {
+        this.showToast('Please close setting board');
+        return;
+      }
+      this.pauseLife();
+      this.showEditGrid = !this.showEditGrid;
+    },
+    handleSetAllCellByType() {
+      let gridRate = !isNaN(this.useSetGridRate) ? Number(this.useSetGridRate) : 100;
+      const type = this.settingType;
+      if (gridRate === 100) {
+        this.world.resetWorld(this.cellSize, type);
+      } else if (gridRate > 0) {
+        this.world.resetWorldByNum(this.cellSize, type, gridRate);
+      }
+    },
     handleMouseDown(e) {
       const clickX = e.clientX; // 点击的像素点位置x（横向）
       const clickY = e.clientY; // 点击的像素点位置y (纵向)
@@ -341,7 +427,9 @@ export default {
       const gotCell = this.world.getCellByPoint(point);
       console.warn('ccccc', gotCell);
       if (this.isSetting) {
-
+        // nothing
+      } else if (this.showEditGrid) {
+        this.world.resetCell(gotCell.col, gotCell.row, this.settingType);
       } else {
         this.setDisplayCell(gotCell);
       }
@@ -371,6 +459,17 @@ export default {
       this.foodNum = res.food;
       this.lifeNum = res.life;
     },
+    showToast(text) {
+      if (this.toastTimeout) {
+        clearTimeout(this.toastTimeout);
+        this.toastTimeout = null;
+      }
+      this.toastText = text;
+      this.toast = true;
+      this.toastTimeout = setTimeout(() => {
+        this.toast = false;
+      }, 6000);
+    }
   },
 };
 </script>

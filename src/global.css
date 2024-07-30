@@ -208,5 +208,20 @@ body {
   position: relative;
   font-size: 14px;
   color: #ffffff;
-  overflow-x: scroll;
+  overflow-x: hidden;
+}
+
+.world-toast-wrapper {
+  width: auto;
+  height: auto;
+  padding: 8px;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 8px;
+  background: rgba(238, 169, 32, 0.8);
+  font-size: 16px;
+  color: #ffffff;
+  z-index: 999999;
 }
